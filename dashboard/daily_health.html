@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fabric DW – Recovery &amp; GC Daily Health</title>
+<style>
+  :root {
+    --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-tertiary: #1c2128;
+    --border: #30363d; --text-primary: #e6edf3; --text-secondary: #8b949e;
+    --blue: #58a6ff; --green: #3fb950; --yellow: #d29922; --red: #f85149;
+    --accent-green: #238636; --accent-red: #da3633;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg-primary); color:var(--text-primary); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }
+  .container { max-width:1280px; margin:0 auto; padding:24px; }
+
+  /* Header */
+  .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+  .header h1 { font-size:24px; font-weight:700; }
+  .header .date { color:var(--text-secondary); font-size:14px; margin-top:4px; }
+  .badge { padding:6px 18px; border-radius:20px; font-size:13px; font-weight:700; color:#fff; }
+
+  /* KPI Cards */
+  .kpi-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:16px; margin-bottom:24px; }
+  .kpi-card { background:var(--bg-tertiary); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; }
+  .kpi-card .label { color:var(--text-secondary); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }
+  .kpi-card .value { font-size:32px; font-weight:700; margin:8px 0 4px; }
+  .kpi-card .delta { font-size:12px; }
+  .delta-up { color:var(--red); } .delta-down { color:var(--green); } .delta-flat { color:var(--text-secondary); }
+
+  /* Alerts */
+  .alerts { margin-bottom:24px; }
+  .alert { padding:12px 16px; border-radius:8px; margin-bottom:8px; font-size:13px; display:flex; align-items:center; gap:8px; }
+  .alert-critical { background:rgba(248,81,73,0.1); border:1px solid var(--accent-red); color:var(--red); }
+  .alert-warning { background:rgba(210,153,34,0.1); border:1px solid var(--yellow); color:var(--yellow); }
+
+  /* Tabs */
+  .tabs { display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+  .tab { padding:8px 16px; border-radius:20px; border:1px solid var(--border); background:var(--bg-tertiary); color:var(--text-secondary); cursor:pointer; font-size:13px; font-weight:500; transition:all 0.2s; }
+  .tab:hover { border-color:var(--blue); color:var(--blue); }
+  .tab.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+  /* Charts */
+  .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+  .chart-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; padding:20px; }
+  .chart-card h3 { font-size:14px; color:var(--text-secondary); margin-bottom:16px; }
+  .bar-chart { display:flex; align-items:flex-end; gap:8px; height:200px; padding-top:8px; }
+  .bar-group { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; height:100%; justify-content:flex-end; }
+  .bar { width:100%; border-radius:4px 4px 0 0; min-height:4px; transition:all 0.3s; cursor:pointer; position:relative; }
+  .bar:hover { opacity:0.8; }
+  .bar-label { font-size:10px; color:var(--text-secondary); text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; }
+  .tooltip { display:none; position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:var(--bg-primary); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-size:11px; white-space:nowrap; z-index:10; color:var(--text-primary); }
+  .bar:hover .tooltip { display:block; }
+
+  /* Donut */
+  .donut-container { display:flex; align-items:center; gap:32px; justify-content:center; }
+  .donut-legend { display:flex; flex-direction:column; gap:8px; }
+  .legend-item { display:flex; align-items:center; gap:8px; font-size:13px; }
+  .legend-dot { width:12px; height:12px; border-radius:50%; }
+
+  /* Tables */
+  .table-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:24px; }
+  .table-card h3 { font-size:14px; color:var(--text-secondary); margin-bottom:12px; }
+  .search-bar { width:100%; padding:10px 16px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:8px; color:var(--text-primary); font-size:13px; margin-bottom:12px; outline:none; }
+  .search-bar:focus { border-color:var(--blue); }
+  .filter-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .filter-btn { padding:4px 12px; border-radius:12px; border:1px solid var(--border); background:var(--bg-tertiary); color:var(--text-secondary); font-size:11px; cursor:pointer; }
+  .filter-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; padding:10px 16px; color:var(--text-secondary); font-size:12px; border-bottom:2px solid var(--border); cursor:pointer; user-select:none; }
+  th:hover { color:var(--blue); }
+  td { padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; }
+  .text-right { text-align:right; }
+  .risk-high { color:var(--red); font-weight:600; }
+  .risk-medium { color:var(--yellow); font-weight:600; }
+  .risk-low { color:var(--green); font-weight:600; }
+
+  /* Links bar */
+  .links-bar { display:flex; gap:16px; justify-content:center; margin-bottom:24px; }
+  .link-btn { padding:10px 24px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; }
+  .link-btn-primary { background:var(--accent-green); color:#fff; }
+  .link-btn-secondary { background:var(--bg-tertiary); border:1px solid var(--border); color:var(--blue); }
+
+  /* Footer */
+  .footer { text-align:center; color:var(--text-secondary); font-size:11px; padding:24px 0; border-top:1px solid var(--border); margin-top:24px; }
+
+  @media (max-width:768px) {
+    .kpi-grid { grid-template-columns:repeat(2,1fr); }
+    .charts-grid { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>🏥 Recovery &amp; GC Daily Health</h1>
+      <div class="date" id="reportDate">{{REPORT_DATE}}</div>
+    </div>
+    <span class="badge" id="statusBadge" style="background:{{STATUS_COLOR}}">{{STATUS_EMOJI}} {{STATUS_LABEL}}</span>
+  </div>
+
+  <!-- Alerts -->
+  <div class="alerts" id="alertsContainer"></div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Feature Tabs -->
+  <div class="tabs" id="featureTabs"></div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>📊 Operations by Feature</h3>
+      <div class="bar-chart" id="opsChart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>❌ Failures by Feature</h3>
+      <div class="bar-chart" id="failChart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>⏱️ P95 Latency by Feature (ms)</h3>
+      <div class="bar-chart" id="latencyChart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>🗂️ Retention Distribution</h3>
+      <div class="donut-container">
+        <svg id="donutChart" width="200" height="200" viewBox="0 0 200 200"></svg>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Links -->
+  <div class="links-bar">
+    <a class="link-btn link-btn-secondary" href="{{POWERBI_URL}}" target="_blank">📈 Feature Usage (Power BI)</a>
+  </div>
+
+  <!-- Customer Impact Table -->
+  <div class="table-card">
+    <h3>👥 Customer Impact</h3>
+    <input class="search-bar" id="customerSearch" type="text" placeholder="Search customers...">
+    <div class="filter-row" id="customerFilters"></div>
+    <table id="customerTable">
+      <thead>
+        <tr>
+          <th data-sort="name">Customer</th>
+          <th data-sort="feature">Feature</th>
+          <th data-sort="ops" class="text-right">Ops</th>
+          <th data-sort="failures" class="text-right">Failures</th>
+          <th data-sort="rate" class="text-right">Failure Rate</th>
+          <th data-sort="status">Status</th>
+        </tr>
+      </thead>
+      <tbody id="customerBody"></tbody>
+    </table>
+  </div>
+
+  <!-- High-Risk Retention Table -->
+  <div class="table-card">
+    <h3>⚠️ High-Risk Retention Customers (&gt;60 days)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th class="text-right">Retention (days)</th>
+          <th class="text-right">Storage (GB)</th>
+          <th class="text-right">Workspaces</th>
+          <th class="text-right">GC/Restore Failures</th>
+          <th>Risk Level</th>
+        </tr>
+      </thead>
+      <tbody id="retentionBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Generated by <strong>Fabric DW Telemetry Agent</strong> •
+    Data: TridentBcdrReliability + Artifacts •
+    <a href="{{POWERBI_URL}}" style="color:var(--blue);">Feature Usage</a>
+  </div>
+</div>
+
+<script>
+// Data injected by generate_dashboard.py
+const kpiData = {{KPI_DATA}};
+const featureData = {{FEATURE_DATA}};
+const retentionData = {{RETENTION_DATA}};
+const alertsData = {{ALERTS_DATA}};
+
+// ── Alerts ──
+const alertsEl = document.getElementById('alertsContainer');
+alertsData.forEach(a => {
+  const div = document.createElement('div');
+  div.className = `alert alert-${a.level}`;
+  div.innerHTML = `<span>${a.level === 'critical' ? '🔴' : '🟡'}</span> ${a.message}`;
+  alertsEl.appendChild(div);
+});
+
+// ── KPI Cards ──
+const kpiGrid = document.getElementById('kpiGrid');
+const kpiConfig = [
+  { key:'total_ops', label:'Total Operations', format:v=>v.toLocaleString() },
+  { key:'failure_rate', label:'Failure Rate', format:v=>v+'%', color:v=>v>=5?'var(--red)':v>=2?'var(--yellow)':'var(--green)' },
+  { key:'avg_p95', label:'Avg P95 Latency', format:v=>v.toLocaleString()+' ms' },
+  { key:'gc_backlog', label:'GC Backlog', format:v=>v.toFixed(1)+' GB' },
+  { key:'impacted', label:'Impacted Customers', format:v=>v.toString(), color:v=>v>0?'var(--red)':'var(--green)' },
+  { key:'active_features', label:'Active Features', format:v=>v.toString() }
+];
+kpiConfig.forEach(k => {
+  const val = kpiData[k.key] || 0;
+  const card = document.createElement('div');
+  card.className = 'kpi-card';
+  const color = k.color ? k.color(val) : 'var(--text-primary)';
+  card.innerHTML = `<div class="label">${k.label}</div><div class="value" style="color:${color}">${k.format(val)}</div>`;
+  kpiGrid.appendChild(card);
+});
+
+// ── Feature Tabs ──
+const tabsEl = document.getElementById('featureTabs');
+const allFeatures = ['All', ...new Set(featureData.map(f=>f.name))];
+let activeFeature = 'All';
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  allFeatures.forEach(f => {
+    const tab = document.createElement('div');
+    tab.className = `tab ${f === activeFeature ? 'active' : ''}`;
+    tab.textContent = f;
+    tab.onclick = () => { activeFeature = f; renderTabs(); renderCharts(); };
+    tabsEl.appendChild(tab);
+  });
+}
+renderTabs();
+
+// ── Bar Charts ──
+function getFiltered() {
+  return activeFeature === 'All' ? featureData : featureData.filter(f=>f.name===activeFeature);
+}
+function renderBarChart(containerId, data, valueKey, color) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  if (!data.length) return;
+  const maxVal = Math.max(...data.map(d=>d[valueKey]), 1);
+  data.forEach(d => {
+    const group = document.createElement('div');
+    group.className = 'bar-group';
+    const h = Math.max((d[valueKey] / maxVal) * 100, 2);
+    const barColor = typeof color === 'function' ? color(d) : color;
+    group.innerHTML = `
+      <div class="bar" style="height:${h}%;background:${barColor}">
+        <div class="tooltip">${d.name}: ${d[valueKey].toLocaleString()}</div>
+      </div>
+      <div class="bar-label">${d.name}</div>`;
+    el.appendChild(group);
+  });
+}
+function renderCharts() {
+  const data = getFiltered();
+  renderBarChart('opsChart', data, 'ops', 'var(--blue)');
+  renderBarChart('failChart', data, 'failures', d => d.failure_rate>=5?'var(--red)':d.failure_rate>=2?'var(--yellow)':'var(--green)');
+  renderBarChart('latencyChart', data, 'p95', 'var(--blue)');
+}
+renderCharts();
+
+// ── Donut Chart ──
+const donutColors = {'1-7':'#58a6ff','8-30':'#3fb950','31-60':'#d29922','61-120':'#f85149'};
+const svg = document.getElementById('donutChart');
+const legend = document.getElementById('donutLegend');
+const total = retentionData.reduce((s,r) => s+r.count, 0) || 1;
+let cumAngle = -90;
+retentionData.forEach(r => {
+  const pct = r.count / total;
+  const angle = pct * 360;
+  const startRad = cumAngle * Math.PI / 180;
+  const endRad = (cumAngle + angle) * Math.PI / 180;
+  const large = angle > 180 ? 1 : 0;
+  const cx=100, cy=100, ro=90, ri=55;
+  const x1o=cx+ro*Math.cos(startRad), y1o=cy+ro*Math.sin(startRad);
+  const x2o=cx+ro*Math.cos(endRad), y2o=cy+ro*Math.sin(endRad);
+  const x1i=cx+ri*Math.cos(endRad), y1i=cy+ri*Math.sin(endRad);
+  const x2i=cx+ri*Math.cos(startRad), y2i=cy+ri*Math.sin(startRad);
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',`M${x1o},${y1o} A${ro},${ro} 0 ${large} 1 ${x2o},${y2o} L${x1i},${y1i} A${ri},${ri} 0 ${large} 0 ${x2i},${y2i} Z`);
+  path.setAttribute('fill', donutColors[r.bucket]||'#8b949e');
+  path.style.cursor = 'pointer';
+  const title = document.createElementNS('http://www.w3.org/2000/svg','title');
+  title.textContent = `${r.bucket} days: ${r.count} customers (${(pct*100).toFixed(1)}%)`;
+  path.appendChild(title);
+  svg.appendChild(path);
+  cumAngle += angle;
+  legend.innerHTML += `<div class="legend-item"><span class="legend-dot" style="background:${donutColors[r.bucket]||'#8b949e'}"></span>${r.bucket}d — ${r.count} (${(pct*100).toFixed(1)}%)</div>`;
+});
+// Center text
+const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+text.setAttribute('x','100');text.setAttribute('y','105');text.setAttribute('text-anchor','middle');
+text.setAttribute('fill','#e6edf3');text.setAttribute('font-size','20');text.setAttribute('font-weight','700');
+text.textContent = total;
+svg.appendChild(text);
+
+// ── Customer Table (placeholder populated by generate_dashboard.py) ──
+// Table sorting
+document.querySelectorAll('#customerTable th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    const tbody = document.getElementById('customerBody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const idx = Array.from(th.parentNode.children).indexOf(th);
+    const asc = th.classList.toggle('sort-asc');
+    rows.sort((a,b) => {
+      const av = a.children[idx].textContent.trim();
+      const bv = b.children[idx].textContent.trim();
+      const an = parseFloat(av.replace(/[,%]/g,''));
+      const bn = parseFloat(bv.replace(/[,%]/g,''));
+      if (!isNaN(an) && !isNaN(bn)) return asc ? an-bn : bn-an;
+      return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+  });
+});
+
+// Search
+document.getElementById('customerSearch').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#customerBody tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>
