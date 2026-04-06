@@ -103,7 +103,7 @@ jobs:
               workflow_id: 'email_notification.yml',
               ref: 'main',
               inputs: {
-                summary_artifact: 'daily-summary-${{ steps.report_date.outputs.date }}',
-                report_date:      '${{ steps.report_date.outputs.date }}'
+                summary_artifact: "daily-summary-${{ steps.report_date.outputs.date }}",
+                report_date:      "${{ steps.report_date.outputs.date }}"
               }
             });
