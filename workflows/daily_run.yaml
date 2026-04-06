@@ -1,0 +1,93 @@
+schedule:
+  cron: "0 7 * * *"
+
+data_sources:
+  telemetry_table: TridentBcdrReliability
+  customer_lookup: Artifacts
+  join_key: WorkspaceId
+  dashboard_powerbi: https://msit.powerbi.com/groups/me/reports/69bc811a-2f14-40d8-9ecd-a672c13f12ea/d82e71a98be8a5972d8e?experience=power-bi
+
+steps:
+  # Step 1: Run KQL queries
+  - run_kql:
+      file: kql/recovery_metrics.kql
+      source: TridentBcdrReliability
+      join: Artifacts on WorkspaceId
+      output: recovery_data
+
+  - run_kql:
+      file: kql/gc_metrics.kql
+      source: TridentBcdrReliability
+      join: Artifacts on WorkspaceId
+      output: gc_data
+
+  - run_kql:
+      file: kql/retention_metrics.kql
+      source: TridentBcdrReliability
+      join: Artifacts on WorkspaceId
+      output: retention_data
+
+  # Step 2: Generate interactive HTML dashboard
+  - run_script:
+      file: dashboard/generate_dashboard.py
+      args:
+        - --recovery-data
+        - recovery_data
+        - --gc-data
+        - gc_data
+        - --retention-data
+        - retention_data
+        - --thresholds
+        - config/thresholds.json
+        - --template
+        - dashboard/daily_health.html
+        - --output
+        - output/daily_health.html
+      output: dashboard_html
+
+  # Step 3: Upload dashboard to hosting
+  - upload:
+      file: output/daily_health.html
+      destination: dashboard_hosting
+      output: dashboard_url
+
+  # Step 4: Run AI agent for executive text summary
+  - run_agent:
+      prompt: prompts/daily_summary.md
+      inputs:
+        - recovery_data
+        - gc_data
+        - retention_data
+      output: agent_summary
+
+  # Step 5: Generate rich HTML email with KPIs + dashboard link
+  - run_script:
+      file: dashboard/generate_email.py
+      args:
+        - --recovery-data
+        - recovery_data
+        - --gc-data
+        - gc_data
+        - --retention-data
+        - retention_data
+        - --thresholds
+        - config/thresholds.json
+        - --dashboard-url
+        - dashboard_url
+        - --agent-summary
+        - agent_summary
+        - --output
+        - output/email_body.html
+      output: email_html
+
+  # Step 6: Send HTML email with dashboard link + agent summary
+  - send_email:
+      subject: "Fabric DW – Recovery & GC Daily Health"
+      body: email_html
+      content_type: text/html
+      recipients:
+        - leadership-dl
+        - oncall-dl
+      attachments:
+        - name: executive_summary.md
+          content: agent_summary

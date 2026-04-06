@@ -1,0 +1,40 @@
+// Recovery Metrics – Restore, TimeTravel, TableClone, WarehouseClone, WarehouseRecovery
+// Source: TridentBcdrReliability joined with Artifacts for customer names
+TridentBcdrReliability
+| where Timestamp >= ago(7d)
+| where OperationName in ("Restore", "TimeTravelQuery", "TableClone", "TableClonePIT", "WarehouseClone", "WarehouseRecovery")
+| join kind=leftouter (
+    Artifacts
+    | project WorkspaceId, CustomerName
+) on WorkspaceId
+| extend IsFailure = (ResultCode != 200)
+| summarize
+    TotalOperations = count(),
+    Failures = countif(IsFailure),
+    FailureRate = round(100.0 * countif(IsFailure) / count(), 2),
+    P50LatencyMs = percentile(DurationMs, 50),
+    P95LatencyMs = percentile(DurationMs, 95),
+    P99LatencyMs = percentile(DurationMs, 99),
+    UniqueCustomers = dcount(CustomerName),
+    ImpactedCustomers = dcount(iff(IsFailure, CustomerName, ""))
+  by bin(Timestamp, 1d), OperationName
+| order by Timestamp desc, OperationName asc
+
+// Top 10 customers by usage per operation (last 24h)
+// TridentBcdrReliability
+// | where Timestamp >= ago(1d)
+// | where OperationName in ("Restore", "TimeTravelQuery", "TableClone", "TableClonePIT", "WarehouseClone", "WarehouseRecovery")
+// | join kind=leftouter (Artifacts | project WorkspaceId, CustomerName) on WorkspaceId
+// | summarize OperationCount = count() by CustomerName, OperationName
+// | top-nested of OperationName by dummy=max(1), top-nested 10 of CustomerName by OperationCount = sum(OperationCount)
+// | project-away dummy
+// | order by OperationName asc, OperationCount desc
+
+// Customers impacted by failures (last 24h)
+// TridentBcdrReliability
+// | where Timestamp >= ago(1d)
+// | where ResultCode != 200
+// | where OperationName in ("Restore", "TimeTravelQuery", "TableClone", "TableClonePIT", "WarehouseClone", "WarehouseRecovery")
+// | join kind=leftouter (Artifacts | project WorkspaceId, CustomerName) on WorkspaceId
+// | summarize FailureCount = count(), ErrorCodes = make_set(ResultCode) by CustomerName, OperationName
+// | order by FailureCount desc

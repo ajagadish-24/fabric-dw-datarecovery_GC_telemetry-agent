@@ -1,0 +1,7 @@
+{
+  "restore_failure_rate_multiplier": 2.0,
+  "latency_regression_pct": 25,
+  "gc_failure_rate_threshold_pct": 5,
+  "gc_backlog_growth_pct": 20,
+  "high_risk_retention_days": 60
+}

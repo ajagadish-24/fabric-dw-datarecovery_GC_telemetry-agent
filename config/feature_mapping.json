@@ -1,0 +1,10 @@
+{
+  "TimeTravel": ["TimeTravelQuery"],
+  "TableClone_Current": ["TableClone"],
+  "TableClone_PointInTime": ["TableClonePIT"],
+  "WarehouseClone": ["WarehouseClone"],
+  "RestoreInPlace": ["Restore"],
+  "WarehouseRecovery": ["WarehouseRecovery"],
+  "GarbageCollection": ["GC"],
+  "ConfigurableRetention": ["Retention"]
+}
