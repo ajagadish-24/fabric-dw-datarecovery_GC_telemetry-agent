@@ -1,0 +1,27 @@
+schedule:
+  cron: "0 7 * * *"
+
+steps:
+  - run_kql:
+      file: kql/recovery_metrics.kql
+      output: recovery_data
+
+  - run_kql:
+      file: kql/gc_metrics.kql
+      output: gc_data
+
+  - run_kql:
+      file: kql/retention_metrics.kql
+      output: retention_data
+
+  - run_agent:
+      prompt: prompts/daily_summary.md
+      inputs:
+        - recovery_data
+        - gc_data
+        - retention_data
+      output: email_body
+
+  - send_email:
+      subject: "Fabric DW – Recovery & GC Daily Health"
+      body: email_body
