@@ -1,0 +1,31 @@
+// =============================================================================
+// KQL Query: Time Travel Telemetry
+// Description: Retrieves telemetry for Time Travel operations on Fabric Data
+//              Warehouse over the specified time range.
+// Parameters:
+//   startTime  - Start of the query window (datetime)
+//   endTime    - End of the query window (datetime)
+// =============================================================================
+
+// TODO: Replace <TelemetryTable> with the actual Kusto table name.
+// TODO: Adjust column names to match your telemetry schema.
+
+let startTime = ago(1d);
+let endTime = now();
+
+<TelemetryTable>
+| where Timestamp between (startTime .. endTime)
+| where FeatureName == "TimeTravel"
+| extend
+    WorkspaceGuid   = tostring(Properties["workspaceId"]),
+    OperationStatus = tostring(Properties["status"]),
+    TargetTimestamp = todatetime(Properties["targetTimestamp"]),
+    DurationMs      = tolong(Properties["durationMs"])
+| summarize
+    TotalOperations  = count(),
+    SuccessCount     = countif(OperationStatus == "Succeeded"),
+    FailureCount     = countif(OperationStatus == "Failed"),
+    AvgDurationMs    = avg(DurationMs),
+    P95DurationMs    = percentile(DurationMs, 95)
+    by WorkspaceGuid, bin(Timestamp, 1h)
+| order by Timestamp desc

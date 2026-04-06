@@ -1,0 +1,38 @@
+// =============================================================================
+// KQL Query: Garbage Collection Telemetry
+// Description: Retrieves telemetry for Garbage Collection (GC) operations on
+//              Fabric Data Warehouse. GC removes expired data files that are
+//              no longer referenced within the configured retention window.
+// Parameters:
+//   startTime  - Start of the query window (datetime)
+//   endTime    - End of the query window (datetime)
+// =============================================================================
+
+// TODO: Replace <TelemetryTable> with the actual Kusto table name.
+// TODO: Adjust column names to match your telemetry schema.
+
+let startTime = ago(1d);
+let endTime = now();
+
+<TelemetryTable>
+| where Timestamp between (startTime .. endTime)
+| where FeatureName == "GarbageCollection"
+| extend
+    WorkspaceGuid           = tostring(Properties["workspaceId"]),
+    WarehouseId             = tostring(Properties["warehouseId"]),
+    OperationStatus         = tostring(Properties["status"]),
+    DurationMs              = tolong(Properties["durationMs"]),
+    FilesDeleted            = tolong(Properties["filesDeleted"]),
+    BytesReclaimed          = tolong(Properties["bytesReclaimed"]),
+    RetentionPeriodDays     = toint(Properties["retentionPeriodDays"]),
+    GCTriggerType           = tostring(Properties["triggerType"])  // "Scheduled" | "Manual"
+| summarize
+    TotalGCRuns             = count(),
+    SuccessCount            = countif(OperationStatus == "Succeeded"),
+    FailureCount            = countif(OperationStatus == "Failed"),
+    TotalFilesDeleted       = sum(FilesDeleted),
+    TotalReclaimedGB        = sum(BytesReclaimed) / 1073741824.0,
+    AvgDurationMs           = avg(DurationMs),
+    P95DurationMs           = percentile(DurationMs, 95)
+    by WorkspaceGuid, WarehouseId, RetentionPeriodDays, GCTriggerType, bin(Timestamp, 1h)
+| order by Timestamp desc

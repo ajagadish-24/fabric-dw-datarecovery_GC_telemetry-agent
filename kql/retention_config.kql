@@ -1,0 +1,42 @@
+// =============================================================================
+// KQL Query: Configurable Retention Period Telemetry
+// Description: Retrieves telemetry for retention period configuration changes
+//              on Fabric Data Warehouse. The valid range is 1–120 days.
+// Parameters:
+//   startTime  - Start of the query window (datetime)
+//   endTime    - End of the query window (datetime)
+// =============================================================================
+
+// TODO: Replace <TelemetryTable> with the actual Kusto table name.
+// TODO: Adjust column names to match your telemetry schema.
+
+let startTime = ago(7d);
+let endTime = now();
+
+// -- Retention configuration change events --
+<TelemetryTable>
+| where Timestamp between (startTime .. endTime)
+| where FeatureName == "RetentionConfiguration"
+| extend
+    WorkspaceGuid           = tostring(Properties["workspaceId"]),
+    WarehouseId             = tostring(Properties["warehouseId"]),
+    PreviousRetentionDays   = toint(Properties["previousRetentionDays"]),
+    NewRetentionDays        = toint(Properties["newRetentionDays"]),
+    OperationStatus         = tostring(Properties["status"]),
+    ChangedBy               = tostring(Properties["changedBy"])
+| where NewRetentionDays between (1 .. 120)   // enforce valid range
+| summarize
+    TotalChanges            = count(),
+    UniqueWorkspaces        = dcount(WorkspaceGuid),
+    AvgRetentionDays        = avg(NewRetentionDays),
+    MinRetentionDays        = min(NewRetentionDays),
+    MaxRetentionDays        = max(NewRetentionDays)
+    by WorkspaceGuid, WarehouseId, bin(Timestamp, 1d)
+| order by Timestamp desc
+
+// -- Distribution of current retention settings across all warehouses --
+// Uncomment and use a separate snapshot table if available:
+// <RetentionSnapshotTable>
+// | where SnapshotTime >= ago(1d)
+// | summarize count() by RetentionPeriodDays
+// | order by RetentionPeriodDays asc

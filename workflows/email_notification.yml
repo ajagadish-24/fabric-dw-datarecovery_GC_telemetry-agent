@@ -1,0 +1,83 @@
+# =============================================================================
+# Workflow: Email Notification
+# Description: Sends the daily executive summary email to configured recipients.
+#              Can be triggered manually or by the daily-summary workflow.
+# =============================================================================
+
+# TODO: Replace placeholder values (marked with <...>) with actual
+#       environment-specific values before deploying.
+
+name: email-notification
+
+on:
+  workflow_dispatch:
+    inputs:
+      summary_artifact:
+        description: "Name of the summary artifact to attach (e.g. daily-summary-2025-04-06)"
+        required: true
+      report_date:
+        description: "Report date in YYYY-MM-DD format"
+        required: true
+      recipients_override:
+        description: "Optional: Comma-separated email override (skips config/email_config.json)"
+        required: false
+        default: ""
+
+jobs:
+  send-email:
+    name: Send Executive Summary Email
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # -----------------------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install openai requests
+
+      # -----------------------------------------------------------------------
+      - name: Download summary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.inputs.summary_artifact }}
+          path: /tmp/summary
+
+      # -----------------------------------------------------------------------
+      # TODO: Implement agent/send_email.py to:
+      #   1. Read the summary from /tmp/summary/daily_summary.md
+      #   2. Load recipients from config/email_config.json (or override)
+      #   3. Call the AI model with prompts/email_template.md to format the email
+      #   4. Send via SMTP or Microsoft Graph API
+      - name: Generate and send email
+        env:
+          SMTP_HOST:         ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:         ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME:     ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD:     ${{ secrets.SMTP_PASSWORD }}
+          SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}
+          OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+          REPORT_DATE:       ${{ github.event.inputs.report_date }}
+          RECIPIENTS_OVERRIDE: ${{ github.event.inputs.recipients_override }}
+        run: |
+          python agent/send_email.py \
+            --summary     /tmp/summary/daily_summary.md \
+            --email-cfg   config/email_config.json \
+            --prompt      prompts/email_template.md \
+            --date        "$REPORT_DATE" \
+            --recipients  "$RECIPIENTS_OVERRIDE"
+
+      # -----------------------------------------------------------------------
+      - name: Log completion
+        run: |
+          echo "Email notification for ${{ github.event.inputs.report_date }} completed successfully."

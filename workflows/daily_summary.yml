@@ -1,0 +1,109 @@
+# =============================================================================
+# Workflow: Daily Executive Summary
+# Description: Runs every day at 06:00 UTC, queries Kusto telemetry for all
+#              Fabric DW recovery features, invokes the AI agent to generate
+#              an executive summary, and stores the result for downstream use.
+# =============================================================================
+
+# TODO: Replace placeholder values (marked with <...>) with actual
+#       environment-specific values before deploying.
+
+name: daily-summary
+
+on:
+  schedule:
+    # Runs every day at 06:00 UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      date_override:
+        description: "Optional: Override report date (YYYY-MM-DD). Defaults to yesterday."
+        required: false
+        default: ""
+
+jobs:
+  generate-summary:
+    name: Generate Daily Executive Summary
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # -----------------------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install azure-kusto-data openai requests
+
+      # -----------------------------------------------------------------------
+      - name: Determine report date
+        id: report_date
+        run: |
+          if [ -n "${{ github.event.inputs.date_override }}" ]; then
+            echo "date=${{ github.event.inputs.date_override }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "date=$(date -u -d 'yesterday' '+%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # TODO: Implement agent/run_kql_queries.py to execute all KQL files in
+      #       the kql/ directory against the Kusto cluster and output JSON.
+      - name: Run KQL telemetry queries
+        env:
+          KUSTO_CLUSTER_URI: ${{ secrets.KUSTO_CLUSTER_URI }}
+          KUSTO_DATABASE:    ${{ secrets.KUSTO_DATABASE }}
+          KUSTO_CLIENT_ID:   ${{ secrets.KUSTO_CLIENT_ID }}
+          KUSTO_CLIENT_SECRET: ${{ secrets.KUSTO_CLIENT_SECRET }}
+          KUSTO_TENANT_ID:   ${{ secrets.KUSTO_TENANT_ID }}
+          REPORT_DATE:       ${{ steps.report_date.outputs.date }}
+        run: |
+          python agent/run_kql_queries.py \
+            --date "$REPORT_DATE" \
+            --output /tmp/telemetry_data.json
+
+      # -----------------------------------------------------------------------
+      # TODO: Implement agent/generate_summary.py to call the AI model with
+      #       the prompt template from prompts/daily_summary.md.
+      - name: Generate AI executive summary
+        env:
+          OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+          REPORT_DATE:       ${{ steps.report_date.outputs.date }}
+        run: |
+          python agent/generate_summary.py \
+            --telemetry   /tmp/telemetry_data.json \
+            --mapping     config/workspace_mapping.json \
+            --prompt      prompts/daily_summary.md \
+            --output      /tmp/daily_summary.md
+
+      # -----------------------------------------------------------------------
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-summary-${{ steps.report_date.outputs.date }}
+          path: /tmp/daily_summary.md
+          retention-days: 30
+
+      # -----------------------------------------------------------------------
+      - name: Trigger email notification workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              workflow_id: 'email_notification.yml',
+              ref: 'main',
+              inputs: {
+                summary_artifact: "daily-summary-${{ steps.report_date.outputs.date }}",
+                report_date:      "${{ steps.report_date.outputs.date }}"
+              }
+            });
