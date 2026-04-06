@@ -1,0 +1,34 @@
+// =============================================================================
+// KQL Query: Restore In Place Telemetry
+// Description: Retrieves telemetry for Restore In Place operations on Fabric
+//              Data Warehouse. This operation restores a warehouse to a
+//              previous state in the same workspace.
+// Parameters:
+//   startTime  - Start of the query window (datetime)
+//   endTime    - End of the query window (datetime)
+// =============================================================================
+
+// TODO: Replace <TelemetryTable> with the actual Kusto table name.
+// TODO: Adjust column names to match your telemetry schema.
+
+let startTime = ago(1d);
+let endTime = now();
+
+<TelemetryTable>
+| where Timestamp between (startTime .. endTime)
+| where FeatureName == "RestoreInPlace"
+| extend
+    WorkspaceGuid       = tostring(Properties["workspaceId"]),
+    WarehouseId         = tostring(Properties["warehouseId"]),
+    RestorePointTime    = todatetime(Properties["restorePointTime"]),
+    OperationStatus     = tostring(Properties["status"]),
+    DurationMs          = tolong(Properties["durationMs"]),
+    InitiatedBy         = tostring(Properties["initiatedBy"])   // "User" or "System"
+| summarize
+    TotalOperations     = count(),
+    SuccessCount        = countif(OperationStatus == "Succeeded"),
+    FailureCount        = countif(OperationStatus == "Failed"),
+    AvgDurationMs       = avg(DurationMs),
+    P95DurationMs       = percentile(DurationMs, 95)
+    by WorkspaceGuid, WarehouseId, bin(Timestamp, 1h)
+| order by Timestamp desc

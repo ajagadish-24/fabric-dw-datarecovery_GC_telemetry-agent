@@ -1,0 +1,40 @@
+{
+  "_comment": "Email notification configuration for the Fabric DW Telemetry Agent. Replace placeholder values before deploying.",
+
+  "smtp": {
+    "_comment": "SMTP server settings. Credentials are loaded from environment variables.",
+    "host": "<SMTP_HOST>",
+    "port": 587,
+    "use_tls": true,
+    "username_env": "SMTP_USERNAME",
+    "password_env": "SMTP_PASSWORD"
+  },
+
+  "sender": {
+    "name": "Fabric DW Telemetry Agent",
+    "address": "<SENDER_EMAIL_ADDRESS>"
+  },
+
+  "recipients": {
+    "_comment": "List of email addresses that receive the daily executive summary.",
+    "to": [
+      "<recipient1@example.com>",
+      "<recipient2@example.com>"
+    ],
+    "cc": [],
+    "bcc": []
+  },
+
+  "email_settings": {
+    "subject_template": "Daily Fabric DW Recovery & GC Telemetry Summary – {date}",
+    "include_dashboard_link": true,
+    "dashboard_url": "<FABRIC_DASHBOARD_URL>",
+    "signature": "Fabric DW Telemetry Agent\nData Warehouse Engineering Team"
+  },
+
+  "schedule": {
+    "_comment": "Email is sent by workflows/email_notification.yml, triggered by daily_summary.yml.",
+    "trigger": "workflow_dispatch",
+    "fallback_time_utc": "06:30"
+  }
+}

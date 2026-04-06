@@ -1,0 +1,67 @@
+{
+  "_comment": "Main agent configuration for the Fabric DW Telemetry Agent. Replace all placeholder values before deploying.",
+
+  "agent": {
+    "name": "Fabric DW Data Recovery & GC Telemetry Agent",
+    "version": "0.1.0",
+    "description": "Queries Kusto telemetry, analyzes Fabric Data Warehouse recovery features, generates daily executive summaries, and sends automated emails.",
+    "log_level": "INFO"
+  },
+
+  "kusto": {
+    "_comment": "Kusto (Azure Data Explorer) connection settings.",
+    "cluster_uri": "<KUSTO_CLUSTER_URI>",
+    "database": "<KUSTO_DATABASE>",
+    "auth": {
+      "method": "service_principal",
+      "tenant_id": "<AZURE_TENANT_ID>",
+      "client_id": "<AZURE_CLIENT_ID>",
+      "client_secret_env": "KUSTO_CLIENT_SECRET"
+    },
+    "query_timeout_seconds": 300
+  },
+
+  "ai_model": {
+    "_comment": "AI model configuration for summary and email generation.",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "api_key_env": "OPENAI_API_KEY",
+    "max_tokens": 2048,
+    "temperature": 0.3
+  },
+
+  "features": {
+    "_comment": "Toggle individual recovery feature telemetry queries on/off.",
+    "time_travel": true,
+    "table_clone": true,
+    "table_clone_point_in_time": true,
+    "dw_clone": true,
+    "restore_in_place": true,
+    "dw_recovery": true,
+    "garbage_collection": true,
+    "retention_config": true
+  },
+
+  "telemetry": {
+    "default_lookback_hours": 24,
+    "retention_lookback_days": 7,
+    "time_bucket_minutes": 60
+  },
+
+  "retention": {
+    "_comment": "Configurable retention period settings (valid range: 1–120 days).",
+    "default_days": 7,
+    "min_days": 1,
+    "max_days": 120
+  },
+
+  "customer_mapping": {
+    "_comment": "Path to the workspace GUID → customer name mapping file.",
+    "file": "config/workspace_mapping.json"
+  },
+
+  "output": {
+    "summary_output_dir": "/tmp/summaries",
+    "artifact_retention_days": 30
+  }
+}

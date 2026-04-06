@@ -1,0 +1,35 @@
+// =============================================================================
+// KQL Query: Data Warehouse Recovery Telemetry
+// Description: Retrieves telemetry for Data Warehouse Recovery operations,
+//              which restore a warehouse from backup to a new or existing
+//              target in Fabric Data Warehouse.
+// Parameters:
+//   startTime  - Start of the query window (datetime)
+//   endTime    - End of the query window (datetime)
+// =============================================================================
+
+// TODO: Replace <TelemetryTable> with the actual Kusto table name.
+// TODO: Adjust column names to match your telemetry schema.
+
+let startTime = ago(1d);
+let endTime = now();
+
+<TelemetryTable>
+| where Timestamp between (startTime .. endTime)
+| where FeatureName == "DataWarehouseRecovery"
+| extend
+    WorkspaceGuid       = tostring(Properties["workspaceId"]),
+    SourceWarehouseId   = tostring(Properties["sourceWarehouseId"]),
+    TargetWarehouseId   = tostring(Properties["targetWarehouseId"]),
+    RecoveryPoint       = todatetime(Properties["recoveryPoint"]),
+    OperationStatus     = tostring(Properties["status"]),
+    DurationMs          = tolong(Properties["durationMs"]),
+    RecoveryType        = tostring(Properties["recoveryType"])  // "FullRecovery" | "PointInTime"
+| summarize
+    TotalOperations     = count(),
+    SuccessCount        = countif(OperationStatus == "Succeeded"),
+    FailureCount        = countif(OperationStatus == "Failed"),
+    AvgDurationMs       = avg(DurationMs),
+    P95DurationMs       = percentile(DurationMs, 95)
+    by WorkspaceGuid, RecoveryType, bin(Timestamp, 1h)
+| order by Timestamp desc

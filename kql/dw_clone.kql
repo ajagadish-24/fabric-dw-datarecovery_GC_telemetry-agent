@@ -1,0 +1,35 @@
+// =============================================================================
+// KQL Query: Data Warehouse Clone Telemetry
+// Description: Retrieves telemetry for full Data Warehouse Clone operations on
+//              Fabric Data Warehouse.
+// Parameters:
+//   startTime  - Start of the query window (datetime)
+//   endTime    - End of the query window (datetime)
+// =============================================================================
+
+// TODO: Replace <TelemetryTable> with the actual Kusto table name.
+// TODO: Adjust column names to match your telemetry schema.
+
+let startTime = ago(1d);
+let endTime = now();
+
+<TelemetryTable>
+| where Timestamp between (startTime .. endTime)
+| where FeatureName == "DataWarehouseClone"
+| extend
+    WorkspaceGuid       = tostring(Properties["workspaceId"]),
+    SourceWarehouseId   = tostring(Properties["sourceWarehouseId"]),
+    TargetWarehouseId   = tostring(Properties["targetWarehouseId"]),
+    PointInTime         = todatetime(Properties["pointInTime"]),
+    OperationStatus     = tostring(Properties["status"]),
+    DurationMs          = tolong(Properties["durationMs"]),
+    DataSizeBytes       = tolong(Properties["dataSizeBytes"])
+| summarize
+    TotalOperations     = count(),
+    SuccessCount        = countif(OperationStatus == "Succeeded"),
+    FailureCount        = countif(OperationStatus == "Failed"),
+    AvgDurationMs       = avg(DurationMs),
+    P95DurationMs       = percentile(DurationMs, 95),
+    TotalDataClonedGB   = sum(DataSizeBytes) / 1073741824.0
+    by WorkspaceGuid, bin(Timestamp, 1h)
+| order by Timestamp desc

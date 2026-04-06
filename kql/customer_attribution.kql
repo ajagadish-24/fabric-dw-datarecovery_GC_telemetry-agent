@@ -1,0 +1,60 @@
+// =============================================================================
+// KQL Query: Customer Attribution – Workspace GUID to Customer Name Mapping
+// Description: Joins telemetry data with the customer/workspace mapping table
+//              to attribute recovery operations to named customers.
+//              Workspace GUID is the primary key for customer identification.
+// Parameters:
+//   startTime  - Start of the query window (datetime)
+//   endTime    - End of the query window (datetime)
+// =============================================================================
+
+// TODO: Replace <TelemetryTable> and <WorkspaceMappingTable> with actual names.
+// TODO: Adjust column names to match your telemetry and mapping schemas.
+
+let startTime = ago(1d);
+let endTime = now();
+
+// Step 1: Load the workspace → customer name mapping
+let WorkspaceMapping =
+    <WorkspaceMappingTable>
+    | project
+        WorkspaceGuid   = tostring(WorkspaceId),
+        CustomerName    = tostring(CustomerName),
+        TenantId        = tostring(TenantId),
+        Region          = tostring(Region);
+
+// Step 2: Aggregate all recovery operations per workspace
+let RecoveryOps =
+    <TelemetryTable>
+    | where Timestamp between (startTime .. endTime)
+    | where FeatureName in (
+        "TimeTravel",
+        "TableClone",
+        "TableClonePointInTime",
+        "DataWarehouseClone",
+        "RestoreInPlace",
+        "DataWarehouseRecovery",
+        "GarbageCollection"
+      )
+    | extend
+        WorkspaceGuid   = tostring(Properties["workspaceId"]),
+        OperationStatus = tostring(Properties["status"])
+    | summarize
+        TotalOperations = count(),
+        SuccessCount    = countif(OperationStatus == "Succeeded"),
+        FailureCount    = countif(OperationStatus == "Failed")
+        by WorkspaceGuid, FeatureName;
+
+// Step 3: Join with customer mapping
+RecoveryOps
+| join kind=leftouter WorkspaceMapping on WorkspaceGuid
+| project
+    CustomerName,
+    WorkspaceGuid,
+    TenantId,
+    Region,
+    FeatureName,
+    TotalOperations,
+    SuccessCount,
+    FailureCount
+| order by TotalOperations desc

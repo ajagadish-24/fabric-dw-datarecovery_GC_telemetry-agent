@@ -1,0 +1,48 @@
+{
+  "_comment": "Workspace GUID to Customer Name mapping for Fabric DW telemetry attribution. Add one entry per customer workspace.",
+  "_schema": {
+    "workspace_id": "Workspace GUID (UUID format)",
+    "customer_name": "Human-readable customer or organization name",
+    "tenant_id": "Azure AD Tenant ID associated with the workspace",
+    "region": "Azure region where the workspace is deployed",
+    "tier": "Fabric capacity tier (e.g., F2, F4, F8, F64)"
+  },
+
+  "mappings": [
+    {
+      "workspace_id": "00000000-0000-0000-0000-000000000001",
+      "customer_name": "Contoso Ltd.",
+      "tenant_id": "00000000-0000-0000-0000-0000000000a1",
+      "region": "eastus",
+      "tier": "F64"
+    },
+    {
+      "workspace_id": "00000000-0000-0000-0000-000000000002",
+      "customer_name": "Fabrikam Inc.",
+      "tenant_id": "00000000-0000-0000-0000-0000000000a2",
+      "region": "westeurope",
+      "tier": "F8"
+    },
+    {
+      "workspace_id": "00000000-0000-0000-0000-000000000003",
+      "customer_name": "Northwind Traders",
+      "tenant_id": "00000000-0000-0000-0000-0000000000a3",
+      "region": "southeastasia",
+      "tier": "F4"
+    },
+    {
+      "workspace_id": "00000000-0000-0000-0000-000000000004",
+      "customer_name": "Adventure Works",
+      "tenant_id": "00000000-0000-0000-0000-0000000000a4",
+      "region": "eastus2",
+      "tier": "F2"
+    },
+    {
+      "workspace_id": "00000000-0000-0000-0000-000000000005",
+      "customer_name": "Wide World Importers",
+      "tenant_id": "00000000-0000-0000-0000-0000000000a5",
+      "region": "australiaeast",
+      "tier": "F8"
+    }
+  ]
+}
