@@ -1,0 +1,33 @@
+{
+  "data_sources": {
+    "telemetry_table": "TridentBcdrReliability",
+    "artifacts_table": "Artifacts",
+    "cluster": "https://your-kusto-cluster.kusto.windows.net",
+    "database": "MonVdwBcdr"
+  },
+  "dashboards": {
+    "daily_health": {
+      "template": "dashboard/daily_health.html",
+      "generator": "dashboard/generate_dashboard.py",
+      "output": "output/daily_health.html",
+      "upload_path": "dashboards/recovery-gc/daily_health.html"
+    }
+  },
+  "email": {
+    "generator": "dashboard/generate_email.py",
+    "subject": "Fabric DW – Recovery & GC Daily Health",
+    "recipients": [
+      "dw-recovery-team@microsoft.com"
+    ],
+    "cc": [],
+    "attach_summary": true
+  },
+  "links": {
+    "powerbi_feature_usage": "https://msit.powerbi.com/groups/me/reports/69bc811a-2f14-40d8-9ecd-a672c13f12ea/d82e71a98be8a5972d8e?experience=power-bi",
+    "hosted_dashboard_base": "https://your-hosting-service/dashboards/recovery-gc/"
+  },
+  "schedule": {
+    "cron": "0 7 * * *",
+    "timezone": "UTC"
+  }
+}
