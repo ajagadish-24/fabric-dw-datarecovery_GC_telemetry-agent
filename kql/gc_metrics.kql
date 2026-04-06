@@ -1,0 +1,18 @@
+// GC Metrics – Garbage Collection health, failure rate, backlog
+// Source: MonVdwBcdr
+Telemetry
+| where OperationName == "GC"
+| where Timestamp >= ago(7d)
+| extend IsFailure = (ResultCode != 200)
+| summarize
+    TotalRuns = count(),
+    Failures = countif(IsFailure),
+    FailureRate = round(100.0 * countif(IsFailure) / count(), 2),
+    P50LatencyMs = percentile(DurationMs, 50),
+    P95LatencyMs = percentile(DurationMs, 95),
+    P99LatencyMs = percentile(DurationMs, 99),
+    BacklogGB = sum(BacklogSizeGB),
+    ImpactedCustomers = dcount(iff(IsFailure, CustomerName, ""))
+  by bin(Timestamp, 1d)
+| extend BacklogGrowthPct = round(100.0 * (BacklogGB - prev(BacklogGB)) / prev(BacklogGB), 2)
+| order by Timestamp desc
