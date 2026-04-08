@@ -30,7 +30,8 @@ FEATURE_LABELS = {
     "Retention": "Retention",
 }
 
-POWERBI_URL = "https://msit.powerbi.com/groups/me/reports/69bc811a-2f14-40d8-9ecd-a672c13f12ea/d82e71a98be8a5972d8e?experience=power-bi"
+POWERBI_DATA_RECOVERY_URL = "https://msit.fabric.microsoft.com/groups/8869af0c-8405-4a99-ab6f-73ad87bf9c0e/reports/d5792894-a260-4877-b670-55aaa120efff/903670727285ffcd6ba4?experience=power-bi"
+POWERBI_GC_TELEMETRY_URL = "https://msit.powerbi.com/groups/me/reports/69bc811a-2f14-40d8-9ecd-a672c13f12ea/ReportSectionac6dc9e5740db24be543?experience=power-bi"
 
 
 def load_json(path):
@@ -135,7 +136,8 @@ def generate_dashboard(args):
     html = html.replace("{{STATUS_LABEL}}", status_label)
     html = html.replace("{{STATUS_EMOJI}}", status_emoji)
     html = html.replace("{{STATUS_COLOR}}", status_color)
-    html = html.replace("{{POWERBI_URL}}", POWERBI_URL)
+    html = html.replace("{{POWERBI_DATA_RECOVERY_URL}}", POWERBI_DATA_RECOVERY_URL)
+    html = html.replace("{{POWERBI_GC_TELEMETRY_URL}}", POWERBI_GC_TELEMETRY_URL)
     html = html.replace("{{KPI_DATA}}", json.dumps(kpi))
     html = html.replace("{{FEATURE_DATA}}", json.dumps(features))
     html = html.replace("{{RETENTION_DATA}}", json.dumps(retention))

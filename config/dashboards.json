@@ -23,7 +23,8 @@
     "attach_summary": true
   },
   "links": {
-    "powerbi_feature_usage": "https://msit.powerbi.com/groups/me/reports/69bc811a-2f14-40d8-9ecd-a672c13f12ea/d82e71a98be8a5972d8e?experience=power-bi",
+    "powerbi_data_recovery": "https://msit.fabric.microsoft.com/groups/8869af0c-8405-4a99-ab6f-73ad87bf9c0e/reports/d5792894-a260-4877-b670-55aaa120efff/903670727285ffcd6ba4?experience=power-bi",
+    "powerbi_gc_telemetry": "https://msit.powerbi.com/groups/me/reports/69bc811a-2f14-40d8-9ecd-a672c13f12ea/ReportSectionac6dc9e5740db24be543?experience=power-bi",
     "hosted_dashboard_base": "https://your-hosting-service/dashboards/recovery-gc/"
   },
   "schedule": {
