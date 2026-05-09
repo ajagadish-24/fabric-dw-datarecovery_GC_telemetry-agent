@@ -21,6 +21,19 @@ steps:
       join: Artifacts on WorkspaceId
       output: gc_data
 
+  - run_script:
+      file: agent/run_kql_queries.py
+      args:
+        - --telemetry-input
+        - config/rti_telemetry_sample.json
+        - --mapping
+        - config/workspace_mapping.json
+        - --feature-mapping
+        - config/feature_mapping.json
+        - --output
+        - attribution_data
+      output: attribution_data
+
   - run_kql:
       file: kql/retention_metrics.kql
       source: TridentBcdrReliability
@@ -39,6 +52,8 @@ steps:
         - retention_data
         - --thresholds
         - config/thresholds.json
+        - --attribution-data
+        - attribution_data
         - --template
         - dashboard/daily_health.html
         - --output
@@ -72,6 +87,8 @@ steps:
         - retention_data
         - --thresholds
         - config/thresholds.json
+        - --attribution-data
+        - attribution_data
         - --dashboard-url
         - dashboard_url
         - --agent-summary

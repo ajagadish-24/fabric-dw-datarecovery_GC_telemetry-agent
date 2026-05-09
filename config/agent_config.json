@@ -45,7 +45,15 @@
   "telemetry": {
     "default_lookback_hours": 24,
     "retention_lookback_days": 7,
-    "time_bucket_minutes": 60
+    "time_bucket_minutes": 60,
+    "rti": {
+      "_comment": "RTI attribution input settings. Telemetry rows are expected to include TenantID and Workspace GUID/WorkspaceId fields.",
+      "enabled": true,
+      "input_env_var": "RTI_TELEMETRY_INPUT",
+      "workspace_id_fields": ["Workspace GUID", "WorkspaceGuid", "WorkspaceId", "workspace_id"],
+      "tenant_id_fields": ["TenantID", "TenantId", "tenant_id"],
+      "feature_fields": ["OperationName", "FeatureName"]
+    }
   },
 
   "retention": {

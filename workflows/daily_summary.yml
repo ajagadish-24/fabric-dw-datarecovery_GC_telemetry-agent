@@ -64,10 +64,13 @@ jobs:
           KUSTO_CLIENT_ID:   ${{ secrets.KUSTO_CLIENT_ID }}
           KUSTO_CLIENT_SECRET: ${{ secrets.KUSTO_CLIENT_SECRET }}
           KUSTO_TENANT_ID:   ${{ secrets.KUSTO_TENANT_ID }}
+          RTI_TELEMETRY_INPUT: ${{ secrets.RTI_TELEMETRY_INPUT }}
           REPORT_DATE:       ${{ steps.report_date.outputs.date }}
         run: |
           python agent/run_kql_queries.py \
             --date "$REPORT_DATE" \
+            --mapping config/workspace_mapping.json \
+            --feature-mapping config/feature_mapping.json \
             --output /tmp/telemetry_data.json
 
       # -----------------------------------------------------------------------

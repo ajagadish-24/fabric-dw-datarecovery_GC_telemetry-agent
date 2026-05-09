@@ -1,0 +1,29 @@
+{
+  "_comment": "Sample RTI telemetry artifact consumed by agent/run_kql_queries.py",
+  "_schema": {
+    "TenantID": "Azure AD tenant GUID",
+    "Workspace GUID": "Fabric workspace GUID",
+    "OperationName": "Recovery/GC operation name",
+    "ResultCode": "200 for success, non-200 for failures",
+    "DurationMs": "Operation duration in milliseconds",
+    "Timestamp": "UTC event timestamp"
+  },
+  "rows": [
+    {
+      "TenantID": "00000000-0000-0000-0000-0000000000a1",
+      "Workspace GUID": "00000000-0000-0000-0000-000000000001",
+      "OperationName": "Restore",
+      "ResultCode": 200,
+      "DurationMs": 1420,
+      "Timestamp": "2026-05-08T09:20:15Z"
+    },
+    {
+      "TenantID": "00000000-0000-0000-0000-0000000000a2",
+      "Workspace GUID": "00000000-0000-0000-0000-000000000002",
+      "OperationName": "GC",
+      "ResultCode": 500,
+      "DurationMs": 3180,
+      "Timestamp": "2026-05-08T11:08:10Z"
+    }
+  ]
+}

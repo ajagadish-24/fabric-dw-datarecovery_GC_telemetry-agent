@@ -30,7 +30,13 @@ Internal telemetry AI agent for **Microsoft Fabric Data Warehouse** — queries 
 ├── config/                          # Configuration files
 │   ├── agent_config.json            # Main agent config (Kusto, AI model, features)
 │   ├── workspace_mapping.json       # Workspace GUID → Customer Name lookup table
+│   ├── rti_telemetry_sample.json    # Sample RTI telemetry input (TenantID + Workspace GUID)
 │   └── email_config.json            # Email recipients, SMTP, and schedule config
+│
+├── agent/                           # Agent scripts/utilities
+│   ├── run_kql_queries.py           # Build attributed telemetry payload from RTI input
+│   ├── generate_summary.py          # Generate markdown summary from attributed payload
+│   └── attribution.py               # Telemetry normalization and feature attribution logic
 │
 └── README.md
 ```
@@ -57,6 +63,38 @@ Internal telemetry AI agent for **Microsoft Fabric Data Warehouse** — queries 
 Customer identity is resolved via **Workspace GUID → Customer Name** mapping stored in [`config/workspace_mapping.json`](config/workspace_mapping.json).  
 The [`kql/customer_attribution.kql`](kql/customer_attribution.kql) query joins telemetry with this mapping to attribute operations to named customers.
 
+## RTI Tenant/Workspace Attribution
+
+The telemetry flow now supports RTI-oriented inputs containing:
+
+- `TenantID`
+- `Workspace GUID` / `WorkspaceId`
+- `OperationName` / `FeatureName`
+
+Use `agent/run_kql_queries.py` to normalize input rows and join with `config/workspace_mapping.json`, producing per-feature attribution with:
+
+- feature usage by tenant/workspace
+- top tenants/workspaces by feature usage
+- failures by feature per tenant/workspace
+
+Example:
+
+```bash
+python agent/run_kql_queries.py \
+  --telemetry-input config/rti_telemetry_sample.json \
+  --mapping config/workspace_mapping.json \
+  --feature-mapping config/feature_mapping.json \
+  --output /tmp/telemetry_data.json
+```
+
+Then generate summary/dashboard/email with optional attribution payload:
+
+```bash
+python agent/generate_summary.py --telemetry /tmp/telemetry_data.json --output /tmp/daily_summary.md
+python dashboard/generate_dashboard.py ... --attribution-data /tmp/telemetry_data.json ...
+python dashboard/generate_email.py ... --attribution-data /tmp/telemetry_data.json ...
+```
+
 ---
 
 ## Getting Started
@@ -69,7 +107,8 @@ The [`kql/customer_attribution.kql`](kql/customer_attribution.kql) query joins t
    - `OPENAI_API_KEY`
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SENDER_EMAIL`
 5. **Replace KQL table names** — update `<TelemetryTable>` and `<WorkspaceMappingTable>` placeholders in each `.kql` file with actual table names.
-6. **Implement agent scripts** — create `agent/run_kql_queries.py`, `agent/generate_summary.py`, and `agent/send_email.py` as referenced in the workflow files.
+6. **Prepare RTI telemetry input** — provide a JSON artifact (or `RTI_TELEMETRY_INPUT` env path) using the schema in `config/rti_telemetry_sample.json`.
+7. **Run agent scripts** — use `agent/run_kql_queries.py` and `agent/generate_summary.py` to produce attributed outputs and summaries.
 
 ---
 
