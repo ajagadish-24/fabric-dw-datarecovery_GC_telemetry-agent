@@ -9,6 +9,7 @@ Usage:
     --gc-data gc_data.json \
     --retention-data retention_data.json \
     --thresholds config/thresholds.json \
+    --attribution-data telemetry_data.json \
     --template dashboard/daily_health.html \
     --output output/daily_health.html
 """
@@ -16,7 +17,7 @@ Usage:
 import argparse
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 FEATURE_LABELS = {
@@ -114,20 +115,70 @@ def build_retention_data(retention_data):
     return buckets
 
 
+def build_customer_impact_data(attribution_data, recovery_data, gc_data):
+    """Build customer/tenant/workspace attribution rows for the dashboard table."""
+    rows = []
+    feature_attribution = attribution_data.get("feature_attribution", []) if isinstance(attribution_data, dict) else []
+    for row in feature_attribution:
+        failures = row.get("failures", 0)
+        rate = row.get("failure_rate", 0)
+        if failures > 0 or rate >= 5:
+            status = "High"
+        elif rate >= 2:
+            status = "Medium"
+        else:
+            status = "Low"
+        rows.append({
+            "name": row.get("customer_name", "Unknown"),
+            "tenant_id": row.get("tenant_id", "unknown-tenant"),
+            "workspace_id": row.get("workspace_id", "unknown-workspace"),
+            "feature": row.get("feature", "Unknown"),
+            "ops": row.get("operations", 0),
+            "failures": failures,
+            "rate": row.get("failure_rate", 0),
+            "status": status,
+            "region": row.get("region", "Unknown"),
+            "tier": row.get("tier", "Unknown"),
+        })
+
+    # Backward-compatible fallback if no attribution payload is available.
+    if not rows:
+        for row in recovery_data + gc_data:
+            feature = FEATURE_LABELS.get(row.get("OperationName", "GC"), row.get("OperationName", "GC"))
+            failures = row.get("Failures", 0)
+            rate = row.get("FailureRate", 0)
+            rows.append({
+                "name": "Unknown",
+                "tenant_id": "unknown-tenant",
+                "workspace_id": "unknown-workspace",
+                "feature": feature,
+                "ops": row.get("TotalOperations", row.get("TotalRuns", 0)),
+                "failures": failures,
+                "rate": rate,
+                "status": "High" if failures > 0 else "Low",
+                "region": "Unknown",
+                "tier": "Unknown",
+            })
+    return rows
+
+
 def generate_dashboard(args):
     recovery_data = load_json(args.recovery_data)
     gc_data = load_json(args.gc_data)
     retention_data = load_json(args.retention_data)
     thresholds = load_json(args.thresholds)
+    attribution_data = load_json(args.attribution_data) if args.attribution_data else {}
 
     with open(args.template, "r") as f:
         template = f.read()
 
-    report_date = datetime.utcnow().strftime("%B %d, %Y")
+    report_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
     status_label, status_emoji, status_color, alerts = compute_health_status(gc_data, recovery_data, thresholds)
     kpi = build_kpi_data(recovery_data, gc_data, retention_data)
     features = build_feature_data(recovery_data, gc_data)
     retention = build_retention_data(retention_data)
+    customer_rows = build_customer_impact_data(attribution_data, recovery_data, gc_data)
+    top_attributed = attribution_data.get("top_workspaces_by_feature", [])[:10] if isinstance(attribution_data, dict) else []
 
     # Replace template placeholders
     html = template
@@ -140,6 +191,8 @@ def generate_dashboard(args):
     html = html.replace("{{FEATURE_DATA}}", json.dumps(features))
     html = html.replace("{{RETENTION_DATA}}", json.dumps(retention))
     html = html.replace("{{ALERTS_DATA}}", json.dumps(alerts))
+    html = html.replace("{{CUSTOMER_DATA}}", json.dumps(customer_rows))
+    html = html.replace("{{ATTRIBUTION_TOP_DATA}}", json.dumps(top_attributed))
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     with open(args.output, "w") as f:
@@ -156,6 +209,7 @@ if __name__ == "__main__":
     parser.add_argument("--gc-data", required=True, help="Path to GC KQL output JSON")
     parser.add_argument("--retention-data", required=True, help="Path to retention KQL output JSON")
     parser.add_argument("--thresholds", required=True, help="Path to thresholds.json")
+    parser.add_argument("--attribution-data", help="Path to RTI attribution JSON payload", default="")
     parser.add_argument("--template", required=True, help="Path to HTML template")
     parser.add_argument("--output", required=True, help="Output HTML file path")
     args = parser.parse_args()

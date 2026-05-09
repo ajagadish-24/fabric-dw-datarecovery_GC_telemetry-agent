@@ -9,6 +9,7 @@ Usage:
     --gc-data gc_data.json \
     --retention-data retention_data.json \
     --thresholds config/thresholds.json \
+    --attribution-data telemetry_data.json \
     --dashboard-url https://your-hosting/daily_health.html \
     --agent-summary agent_summary.md \
     --output output/email_body.html
@@ -17,7 +18,7 @@ Usage:
 import argparse
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 POWERBI_URL = "https://msit.powerbi.com/groups/me/reports/69bc811a-2f14-40d8-9ecd-a672c13f12ea/d82e71a98be8a5972d8e?experience=power-bi"
@@ -56,15 +57,21 @@ def failure_rate_color(rate):
     return "#3fb950"
 
 
+def build_attribution_rows(attribution_data, top_n=5):
+    rows = attribution_data.get("top_workspaces_by_feature", []) if isinstance(attribution_data, dict) else []
+    return sorted(rows, key=lambda r: (-r.get("operations", 0), -r.get("failures", 0)))[:top_n]
+
+
 def generate_email(args):
     recovery_data = load_json(args.recovery_data)
     gc_data = load_json(args.gc_data)
     retention_data = load_json(args.retention_data)
     thresholds = load_json(args.thresholds)
+    attribution_data = load_json(args.attribution_data) if args.attribution_data else {}
     agent_summary = load_text(args.agent_summary)
     dashboard_url = args.dashboard_url
 
-    report_date = datetime.utcnow().strftime("%B %d, %Y")
+    report_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
     status_label, status_color = compute_health(recovery_data, gc_data, thresholds)
 
     # Aggregate KPIs
@@ -106,6 +113,36 @@ def generate_email(args):
         color = colors.get(bucket, "#8b949e")
         retention_segments += f'<td style="width:{pct}%; background:{color}; height:28px; text-align:center; color:#fff; font-size:11px; font-weight:600;">{pct}%</td>'
         retention_labels += f'<td style="text-align:center; color:#8b949e; font-size:11px; padding-top:4px;">{bucket}d ({count})</td>'
+
+    attribution_rows = build_attribution_rows(attribution_data)
+    attributed_usage_html = ""
+    if attribution_rows:
+        table_rows = ""
+        for row in attribution_rows:
+            table_rows += f"""
+            <tr>
+              <td style="padding:10px 12px; border-bottom:1px solid #30363d; color:#e6edf3;">{row.get("feature", "Unknown")}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #30363d; color:#8b949e;">{row.get("tenant_id", "unknown-tenant")}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #30363d; color:#8b949e;">{row.get("workspace_id", "unknown-workspace")}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #30363d; color:#e6edf3; text-align:right;">{row.get("operations", 0):,}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #30363d; color:#e6edf3; text-align:right;">{row.get("failures", 0):,}</td>
+            </tr>"""
+        attributed_usage_html = f"""
+        <tr>
+          <td style="padding:0 32px 24px;">
+            <div style="color:#8b949e; font-size:13px; font-weight:600; margin-bottom:8px;">🏷️ Top Attributed Feature Usage</div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#1c2128; border:1px solid #30363d; border-radius:8px; overflow:hidden;">
+              <tr style="background:#161b22;">
+                <th style="padding:10px 12px; text-align:left; color:#8b949e; font-size:12px; border-bottom:2px solid #30363d;">Feature</th>
+                <th style="padding:10px 12px; text-align:left; color:#8b949e; font-size:12px; border-bottom:2px solid #30363d;">Tenant</th>
+                <th style="padding:10px 12px; text-align:left; color:#8b949e; font-size:12px; border-bottom:2px solid #30363d;">Workspace</th>
+                <th style="padding:10px 12px; text-align:right; color:#8b949e; font-size:12px; border-bottom:2px solid #30363d;">Ops</th>
+                <th style="padding:10px 12px; text-align:right; color:#8b949e; font-size:12px; border-bottom:2px solid #30363d;">Failures</th>
+              </tr>
+              {table_rows}
+            </table>
+          </td>
+        </tr>"""
 
     # Convert agent summary markdown to simple HTML (basic)
     summary_html = agent_summary.replace("\n\n", "</p><p>").replace("\n", "<br>")
@@ -192,6 +229,8 @@ def generate_email(args):
     </td>
   </tr>
 
+  {attributed_usage_html}
+
   <!-- Dashboard Button -->
   <tr>
     <td style="padding:0 32px 24px;" align="center">
@@ -256,6 +295,7 @@ if __name__ == "__main__":
     parser.add_argument("--gc-data", required=True)
     parser.add_argument("--retention-data", required=True)
     parser.add_argument("--thresholds", required=True)
+    parser.add_argument("--attribution-data", default="")
     parser.add_argument("--dashboard-url", required=True)
     parser.add_argument("--agent-summary", required=True)
     parser.add_argument("--output", required=True)

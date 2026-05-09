@@ -75,6 +75,7 @@
   .risk-high { color:var(--red); font-weight:600; }
   .risk-medium { color:var(--yellow); font-weight:600; }
   .risk-low { color:var(--green); font-weight:600; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; }
 
   /* Links bar */
   .links-bar { display:flex; gap:16px; justify-content:center; margin-bottom:24px; }
@@ -142,21 +143,41 @@
 
   <!-- Customer Impact Table -->
   <div class="table-card">
-    <h3>👥 Customer Impact</h3>
+    <h3>👥 Customer / Tenant / Workspace Impact</h3>
     <input class="search-bar" id="customerSearch" type="text" placeholder="Search customers...">
     <div class="filter-row" id="customerFilters"></div>
     <table id="customerTable">
       <thead>
         <tr>
           <th data-sort="name">Customer</th>
+          <th data-sort="tenant">Tenant</th>
+          <th data-sort="workspace">Workspace</th>
           <th data-sort="feature">Feature</th>
           <th data-sort="ops" class="text-right">Ops</th>
           <th data-sort="failures" class="text-right">Failures</th>
           <th data-sort="rate" class="text-right">Failure Rate</th>
+          <th data-sort="region">Region/Tier</th>
           <th data-sort="status">Status</th>
         </tr>
       </thead>
       <tbody id="customerBody"></tbody>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <h3>🏷️ Top Attributed Feature Usage</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Customer</th>
+          <th>Tenant</th>
+          <th>Workspace</th>
+          <th class="text-right">Ops</th>
+          <th class="text-right">Failures</th>
+        </tr>
+      </thead>
+      <tbody id="attributionTopBody"></tbody>
     </table>
   </div>
 
@@ -192,6 +213,8 @@ const kpiData = {{KPI_DATA}};
 const featureData = {{FEATURE_DATA}};
 const retentionData = {{RETENTION_DATA}};
 const alertsData = {{ALERTS_DATA}};
+const customerData = {{CUSTOMER_DATA}};
+const attributionTopData = {{ATTRIBUTION_TOP_DATA}};
 
 // ── Alerts ──
 const alertsEl = document.getElementById('alertsContainer');
@@ -303,6 +326,73 @@ text.textContent = total;
 svg.appendChild(text);
 
 // ── Customer Table (placeholder populated by generate_dashboard.py) ──
+function statusClass(status) {
+  const value = (status || '').toLowerCase();
+  if (value === 'high') return 'risk-high';
+  if (value === 'medium') return 'risk-medium';
+  return 'risk-low';
+}
+
+function renderCustomerRows() {
+  const body = document.getElementById('customerBody');
+  const filters = document.getElementById('customerFilters');
+  body.innerHTML = '';
+  filters.innerHTML = '';
+  const features = ['All', ...new Set(customerData.map(r => r.feature))];
+  let active = 'All';
+  const draw = () => {
+    body.innerHTML = '';
+    const rows = customerData.filter(r => active === 'All' || r.feature === active);
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.name}</td>
+        <td class="mono">${r.tenant_id}</td>
+        <td class="mono">${r.workspace_id}</td>
+        <td>${r.feature}</td>
+        <td class="text-right">${(r.ops || 0).toLocaleString()}</td>
+        <td class="text-right">${(r.failures || 0).toLocaleString()}</td>
+        <td class="text-right">${(r.rate || 0).toFixed(2)}%</td>
+        <td>${r.region}/${r.tier}</td>
+        <td class="${statusClass(r.status)}">${r.status}</td>`;
+      body.appendChild(tr);
+    });
+  };
+  features.forEach(f => {
+    const btn = document.createElement('button');
+    btn.className = `filter-btn ${f === 'All' ? 'active' : ''}`;
+    btn.textContent = f;
+    btn.onclick = () => {
+      active = f;
+      document.querySelectorAll('#customerFilters .filter-btn').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      draw();
+    };
+    filters.appendChild(btn);
+  });
+  draw();
+}
+
+function renderAttributionTopRows() {
+  const body = document.getElementById('attributionTopBody');
+  body.innerHTML = '';
+  attributionTopData.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.feature || 'Unknown'}</td>
+      <td>${r.customer_name || 'Unknown'}</td>
+      <td class="mono">${r.tenant_id || 'unknown-tenant'}</td>
+      <td class="mono">${r.workspace_id || 'unknown-workspace'}</td>
+      <td class="text-right">${(r.operations || 0).toLocaleString()}</td>
+      <td class="text-right">${(r.failures || 0).toLocaleString()}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+renderCustomerRows();
+renderAttributionTopRows();
+
+// ── Customer Table sorting
 // Table sorting
 document.querySelectorAll('#customerTable th[data-sort]').forEach(th => {
   th.addEventListener('click', () => {
